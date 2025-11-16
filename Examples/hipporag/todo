@@ -1,0 +1,5 @@
+to fix the path of the .json thingy (that we place its absolute)
+
+this:
+
+rerank_dspy_file_path="/home/amjad/benchmarks/HippoRAG/src/hipporag/prompts/dspy_prompts/filter_llama3.3-70B-Instruct.json",

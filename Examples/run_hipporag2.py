@@ -101,9 +101,10 @@ def process_corpus(
     
     # Format chunks as documents
     docs = [f'{idx}:{chunk}' for idx, chunk in enumerate(chunks)]
-    
+    docs = docs[:20]
     # Get questions for this corpus
     corpus_questions = questions.get(corpus_name, [])
+    corpus_questions = corpus_questions[:100]
     if not corpus_questions:
         logging.warning(f"⚠️ No questions found for corpus: {corpus_name}")
         return
@@ -126,7 +127,7 @@ def process_corpus(
         embedding_model_name=embed_model_path,
         force_index_from_scratch=True,
         force_openie_from_scratch=True,
-        rerank_dspy_file_path="hipporag/prompts/dspy_prompts/filter_llama3.3-70B-Instruct.json",
+        rerank_dspy_file_path="Examples/hipporag/prompts/dspy_prompts/filter_llama3.3-70B-Instruct.json",
         retrieval_top_k=5,
         linking_top_k=5,
         max_qa_steps=3,
@@ -295,6 +296,7 @@ def main():
         for r in results:
             if isinstance(r, Exception):
                 logging.exception(f"❌ Task failed: {r}")
+                raise(r)
 
     asyncio.run(_run_all())
 
