@@ -104,7 +104,7 @@ def process_corpus(
     docs = docs[:20]
     # Get questions for this corpus
     corpus_questions = questions.get(corpus_name, [])
-    corpus_questions = corpus_questions[:100]
+    corpus_questions = corpus_questions[:10]
     if not corpus_questions:
         logging.warning(f"⚠️ No questions found for corpus: {corpus_name}")
         return
@@ -190,14 +190,22 @@ def main():
         "novel": {
             "corpus": "./Datasets/Corpus/novel.parquet",
             "questions": "./Datasets/Questions/novel_questions.parquet"
+        },
+        "dummy_medical":{
+            "corpus": "./Datasets/Corpus/dummy_medical.parquet",
+            "questions": "./Datasets/Questions/dummy_medical_questions.parquet"
+        },
+        "dummy_physics":{
+            "corpus": "./Datasets/Corpus/dummy_physics.parquet",
+            "questions": "./Datasets/Questions/dummy_physics_questions.parquet"            
         }
     }
     
     parser = argparse.ArgumentParser(description="HippoRAG: Process Corpora and Answer Questions")
     
     # Core arguments
-    parser.add_argument("--subset", required=True, choices=["medical", "novel"], 
-                        help="Subset to process (medical or novel)")
+    parser.add_argument("--subset", required=True, choices=["medical", "novel", "dummy_medical", "dummy_physics"], 
+                        help="Subset to process (medical or novel or dummy_medical)")
     parser.add_argument("--base_dir", default="./hipporag2_workspace", 
                         help="Base working directory for HippoRAG")
     
