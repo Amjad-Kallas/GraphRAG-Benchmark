@@ -45,8 +45,9 @@ def group_questions_by_source(question_list: List[dict]) -> Dict[str, List[dict]
 def split_text(
     text: str, 
     tokenizer: AutoTokenizer, 
-    chunk_token_size: int = 256, 
-    chunk_overlap_token_size: int = 32
+    # amjad: here we change token size
+    chunk_token_size: int = 128, #256, 
+    chunk_overlap_token_size: int = 20 #32
 ) -> List[str]:
     """Split text into chunks based on token length with overlap"""
     tokens = tokenizer.encode(text, add_special_tokens=False)
@@ -101,7 +102,7 @@ def process_corpus(
     
     # Format chunks as documents
     docs = [f'{idx}:{chunk}' for idx, chunk in enumerate(chunks)]
-    docs = docs[:20]
+    docs = docs[:200]
     # Get questions for this corpus
     corpus_questions = questions.get(corpus_name, [])
     corpus_questions = corpus_questions[:10]
