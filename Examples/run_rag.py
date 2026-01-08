@@ -72,7 +72,7 @@ class VLLMGenerator:
         self,
         base_url: str,
         model: str,
-        temperature: float = 0.7,
+        temperature: float = 0.0,
         max_tokens: int = 512,
     ):
         self.url = f"{base_url}/v1/chat/completions"
@@ -132,11 +132,15 @@ class VanillaRAG:
             q_emb = self.text_embedder.run(text=q)["embedding"]
             retrieved = self.retriever.run(query_embedding=q_emb)["documents"]
 
-            context = "\n".join(doc.content for doc in retrieved)
+            # ✅ list of chunk strings (what you want in JSON)
+            context_chunks = [doc.content for doc in retrieved]
+
+            # ✅ still build a single string for the LLM prompt
+            context_for_prompt = "\n".join(context_chunks)
 
             prompt = (
                 "Answer the question using only the context below.\n\n"
-                f"Context:\n{context}\n\n"
+                f"Context:\n{context_for_prompt}\n\n"
                 f"Question: {q}\nAnswer:"
             )
 
@@ -144,7 +148,7 @@ class VanillaRAG:
 
             outputs.append({
                 "question": q,
-                "docs": context,
+                "docs": context_chunks,   # ✅ now list, not string
                 "answer": answer,
             })
         return outputs
@@ -163,24 +167,25 @@ def process_corpus(
     llm_model_name: str,
     questions: Dict[str, List[dict]],
     sample: int,
+    rag,
 ):
     logging.info(f"📚 Processing corpus: {corpus_name}")
 
     output_dir = f"./results/rag/{corpus_name}"
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f"predictions_{corpus_name}.json")
+    output_path = os.path.join(output_dir, f"predictions_{corpus_name}_new.json")
 
     tokenizer = AutoTokenizer.from_pretrained(embed_model_path)
     chunks = split_text(context, tokenizer)
     docs = [f"{i}:{chunk}" for i, chunk in enumerate(chunks)]
 
-    docs = docs[:10]
+    # docs = docs[:10]
 
     corpus_questions = questions.get(corpus_name, [])
     if sample and sample < len(corpus_questions):
         corpus_questions = corpus_questions[:sample]
 
-    corpus_questions = corpus_questions[:5]
+    # corpus_questions = corpus_questions[:5]
 
     all_queries = [q["question"] for q in corpus_questions]
 
@@ -189,11 +194,7 @@ def process_corpus(
         model=llm_model_name,
     )
 
-    rag = VanillaRAG(
-        embed_model_path=embed_model_path,
-        llm=llm,
-        retrieval_top_k=5,
-    )
+
 
     rag.index(docs)
     solutions = rag.rag_qa(all_queries)
@@ -222,7 +223,7 @@ def process_corpus(
 # Main
 # ============================================================
 
-def main():
+'''def main():
     SUBSET_PATHS = {
         "medical": {
             "corpus": "./Datasets/Corpus/medical.parquet",
@@ -279,6 +280,87 @@ def main():
         await asyncio.gather(*tasks)
 
     asyncio.run(run_all())
+'''
+
+# main for sequential execution
+
+def main():
+    SUBSET_PATHS = {
+        "medical": {
+            "corpus": "./Datasets/Corpus/medical.parquet",
+            "questions": "./Datasets/Questions/medical_questions.parquet",
+        },
+        "novel": {
+            "corpus": "./Datasets/Corpus/novel.parquet",
+            "questions": "./Datasets/Questions/novel_questions.parquet",
+        },
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--subset", required=True, choices=["medical", "novel"])
+    parser.add_argument("--base_dir", default="./rag_workspace")
+    parser.add_argument("--embed_model_path", required=True)
+    parser.add_argument("--llm_base_url", default="http://localhost:8000")
+    parser.add_argument("--llm_model_name", required=True)
+    parser.add_argument("--sample", type=int, default=None)
+
+    args = parser.parse_args()
+
+    # --------------------------------------------------
+    # Load corpus
+    # --------------------------------------------------
+    corpus_path = SUBSET_PATHS[args.subset]["corpus"]
+    corpus_ds = load_dataset("parquet", data_files=corpus_path, split="train")
+    corpus_data = [
+        {"corpus_name": x["corpus_name"], "context": x["context"]}
+        for x in corpus_ds
+    ]
+
+    if args.sample:
+        corpus_data = corpus_data[:1]
+
+    # --------------------------------------------------
+    # Load questions
+    # --------------------------------------------------
+    questions_path = SUBSET_PATHS[args.subset]["questions"]
+    questions_ds = load_dataset("parquet", data_files=questions_path, split="train")
+    questions = [{
+        "id": q["id"],
+        "source": q["source"],
+        "question": q["question"],
+        "answer": q["answer"],
+        "question_type": q["question_type"],
+        "evidence": q["evidence"],
+    } for q in questions_ds]
+
+    grouped_questions = group_questions_by_source(questions)
+
+    # --------------------------------------------------
+    # Initialize LLM + RAG ONCE (CRITICAL FIX)
+    # --------------------------------------------------
+    llm = VLLMGenerator(
+        base_url=args.llm_base_url,
+        model=args.llm_model_name,
+    )
+
+    for item in corpus_data:
+        rag = VanillaRAG(
+            embed_model_path=args.embed_model_path,
+            llm=llm,
+            retrieval_top_k=5,
+        )
+
+        process_corpus(
+            corpus_name=item["corpus_name"],
+            context=item["context"],
+            base_dir=args.base_dir,
+            embed_model_path=args.embed_model_path,
+            llm_base_url=args.llm_base_url,
+            llm_model_name=args.llm_model_name,
+            questions=grouped_questions,
+            sample=args.sample,
+            rag=rag,
+        )
 
 
 if __name__ == "__main__":

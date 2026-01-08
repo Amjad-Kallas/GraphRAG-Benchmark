@@ -45,9 +45,8 @@ def group_questions_by_source(question_list: List[dict]) -> Dict[str, List[dict]
 def split_text(
     text: str, 
     tokenizer: AutoTokenizer, 
-    # amjad: here we change token size
-    chunk_token_size: int = 128, #256, 
-    chunk_overlap_token_size: int = 20 #32
+    chunk_token_size: int = 500, #256, 
+    chunk_overlap_token_size: int = 70 #32
 ) -> List[str]:
     """Split text into chunks based on token length with overlap"""
     tokens = tokenizer.encode(text, add_special_tokens=False)
@@ -102,10 +101,10 @@ def process_corpus(
     
     # Format chunks as documents
     docs = [f'{idx}:{chunk}' for idx, chunk in enumerate(chunks)]
-    docs = docs[:200]
+
     # Get questions for this corpus
     corpus_questions = questions.get(corpus_name, [])
-    corpus_questions = corpus_questions[:10]
+
     if not corpus_questions:
         logging.warning(f"⚠️ No questions found for corpus: {corpus_name}")
         return
@@ -263,7 +262,8 @@ def main():
     
     # Sample corpus data if requested
     if args.sample:
-        corpus_data = corpus_data[:1]
+        corpus_data = corpus_data[:5]
+    # corpus_data = corpus_data[5:6]
     
     # Load question data
     try:
@@ -285,7 +285,7 @@ def main():
         return
     
     # Process each corpus concurrently using asyncio + threads
-    async def _run_all():
+    '''async def _run_all():
         tasks = []
         for item in corpus_data:
             tasks.append(asyncio.to_thread(
@@ -307,7 +307,26 @@ def main():
                 logging.exception(f"❌ Task failed: {r}")
                 raise(r)
 
-    asyncio.run(_run_all())
+    asyncio.run(_run_all())'''
+
+    # Process each corpus SEQUENTIALLY, because the GPU gets overloaded if we run them all in parallel
+    for item in corpus_data:
+        try:
+            process_corpus(
+                item["corpus_name"],
+                item["context"],
+                args.base_dir,
+                args.mode,
+                args.model_name,
+                args.embed_model_path,
+                args.llm_base_url,
+                api_key,
+                grouped_questions,
+                args.sample,
+            )
+        except Exception as e:
+            logging.exception(f"❌ Task failed: {e}")
+            raise
 
 if __name__ == "__main__":
     main()

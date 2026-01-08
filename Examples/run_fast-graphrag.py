@@ -36,21 +36,6 @@ def group_questions_by_source(question_list: List[dict]) -> Dict[str, List[dict]
         grouped_questions[source].append(question)
     return grouped_questions
 
-def to_jsonable(o):
-    if hasattr(o, "model_dump"):
-        return o.model_dump()
-    if hasattr(o, "dict"):
-        return o.dict()
-    try:
-        from dataclasses import is_dataclass, asdict
-        if is_dataclass(o):
-            return asdict(o)
-    except:
-        pass
-    if hasattr(o, "__dict__"):
-        return {k: to_jsonable(v) for k, v in vars(o).items() if not k.startswith("_")}
-    return str(o)
-
 def process_corpus(
     corpus_name: str,
     context: str,
@@ -83,20 +68,9 @@ def process_corpus(
     # Initialize LLM service based on mode
     if mode == "ollama":
         # Create Ollama client
-        #ollama_client = OllamaClient(base_url=llm_base_url)
-        #llm_service = OllamaWrapper(ollama_client, model_name)
-        #logging.info(f"✅ Using Ollama LLM service: {model_name} at {llm_base_url}")
-
-
-        # amjad
-        llm_service = OpenAILLMService(
-        model=model_name,                      # e.g. "llama3.1:8b" or "qwen2.5:14b"
-        base_url=llm_base_url or "http://localhost:11434/v1",
-        api_key="ollama",                      # any non-empty string
-        client="openai")
-
-        logging.info(f"✅ Using Ollama (OpenAI-compatible): {model_name} @ {llm_base_url}")
-    
+        ollama_client = OllamaClient(base_url=llm_base_url)
+        llm_service = OllamaWrapper(ollama_client, model_name)
+        logging.info(f"✅ Using Ollama LLM service: {model_name} at {llm_base_url}")
     else:
         # Use OpenAI-compatible service
         llm_service = OpenAILLMService(
@@ -117,36 +91,23 @@ def process_corpus(
             embedding_service=HuggingFaceEmbeddingService(
                 model=embedding_model,
                 tokenizer=embedding_tokenizer,
-                embedding_dim=768,
-                max_token_size=8192
+                embedding_dim=1024,
+                max_token_size=480 # because bge-large-en-v1.5 has 512, so a safe choice would be 480
             ),
         ),
     )
     
-    def split_into_token_chunks(tokenizer, text, max_tokens=400, overlap=50):
-        ids = tokenizer(text, add_special_tokens=False)["input_ids"]
-        chunks, start = [], 0
-        while start < len(ids):
-            end = min(start + max_tokens, len(ids))
-            chunk_ids = ids[start:end]
-            chunk_text = tokenizer.decode(chunk_ids)
-            chunks.append(chunk_text)
-            if end == len(ids): break
-            start = max(0, end - overlap)
-        return chunks
-
-    # --- replace the truncation with this ---
-    #chunks = split_into_token_chunks(embedding_tokenizer, context, max_tokens=400, overlap=50)
-    grag.insert(context[:20000])
+    # Index the corpus content
+    grag.insert(context)
     logging.info(f"✅ Indexed corpus: {corpus_name} ({len(context.split())} words)")
     
     # Get questions for this corpus
     corpus_questions = questions.get(corpus_name, [])
-    corpus_questions = corpus_questions[:10]
     if not corpus_questions:
         logging.warning(f"⚠️ No questions found for corpus: {corpus_name}")
         return
     
+    #corpus_questions = corpus_questions[:5]
     # Sample questions if requested
     if sample and sample < len(corpus_questions):
         corpus_questions = corpus_questions[:sample]
@@ -161,7 +122,7 @@ def process_corpus(
             response = grag.query(q["question"])
             context_chunks = response.to_dict()['context']['chunks']
             contexts = [item[0]["content"] for item in context_chunks]
-            predicted_answer = response.response
+            predicted_answer = response.response.answer
 
             # Collect results
             results.append({
@@ -183,7 +144,7 @@ def process_corpus(
     
     # Save results
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False, default=to_jsonable)
+        json.dump(results, f, indent=2, ensure_ascii=False)
     
     logging.info(f"💾 Saved {len(results)} predictions to: {output_path}")
 
@@ -197,21 +158,13 @@ def main():
         "novel": {
             "corpus": "./Datasets/Corpus/novel.parquet",
             "questions": "./Datasets/Questions/novel_questions.parquet"
-        },
-        "dummy_medical": {
-            "corpus": "./Datasets/Corpus/dummy_medical.parquet",
-            "questions": "./Datasets/Questions/dummy_medical_questions.parquet"
-        },
-        "dummy_physics": {
-            "corpus": "./Datasets/Corpus/dummy_physics.parquet",
-            "questions": "./Datasets/Questions/dummy_physics_questions.parquet"
-        },
+        }
     }
     
     parser = argparse.ArgumentParser(description="GraphRAG: Process Corpora and Answer Questions")
     
     # Core arguments
-    parser.add_argument("--subset", required=True, choices=["medical", "novel", "dummy_medical", "dummy_physics"], 
+    parser.add_argument("--subset", required=True, choices=["medical", "novel"], 
                         help="Subset to process (medical or novel)")
     parser.add_argument("--base_dir", default="./Examples/graphrag_workspace", 
                         help="Base working directory for GraphRAG")

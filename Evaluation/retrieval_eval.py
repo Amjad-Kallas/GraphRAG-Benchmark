@@ -20,7 +20,7 @@ async def evaluate_dataset(
     dataset: Dataset,
     llm: Any,
     embeddings: Embeddings,
-    max_concurrent: int = 1,
+    max_concurrent: int = 4,
     detailed_output: bool = False
 ) -> Dict[str, Any]:
     """Evaluate context relevance and recall for a dataset"""
@@ -142,7 +142,7 @@ async def main(args: argparse.Namespace):
             api_key=SecretStr(api_key),
             temperature=0.0,
             max_retries=3,
-            timeout=30,
+            timeout=120, # also here it is better to increase the timeout so we don't get it reached early
             model_kwargs={
                 "top_p": 1,
                 "seed": SEED,

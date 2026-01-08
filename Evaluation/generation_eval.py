@@ -20,7 +20,7 @@ async def evaluate_dataset(
     metrics: List[str],
     llm: Any,
     embeddings: Embeddings,
-    max_concurrent: int = 3,  # Limit concurrent evaluations
+    max_concurrent: int = 4,  # Limit concurrent evaluations
     detailed_output: bool = False
 ) -> Dict[str, Any]:
     """Evaluate the metric scores on the entire dataset."""
@@ -157,7 +157,7 @@ async def main(args: argparse.Namespace):
             api_key=SecretStr(api_key),
             temperature=0.0,
             max_retries=3,
-            timeout=30,
+            timeout=120, # since our GPU is NOT fast enough, we need to increase this timeout
             model_kwargs={
                 "top_p": 1,
                 "seed": SEED,
@@ -201,6 +201,23 @@ async def main(args: argparse.Namespace):
         'Contextual Summarize': ["answer_correctness", "coverage_score"],
         'Creative Generation': ["answer_correctness", "coverage_score", "faithfulness"]
     }
+
+    # Define the evaluation metrics for each question type
+    '''metric_config = {
+        'Fact Retrieval': ["rouge_score", "answer_correctness"]
+    }'''
+
+    '''metric_config = {
+        'Complex Reasoning': ["rouge_score", "answer_correctness"]
+    }'''
+
+    '''metric_config = {
+        'Contextual Summarize': ["answer_correctness", "coverage_score"]
+    }'''
+
+    '''metric_config = {
+        'Creative Generation': ["answer_correctness", "coverage_score", "faithfulness"]
+    }'''
     
     # Group data by question type
     grouped_data = {}

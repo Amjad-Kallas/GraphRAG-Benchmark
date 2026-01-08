@@ -150,7 +150,8 @@ async def compute_answer_correctness(
     ground_truth: str,
     llm: BaseLanguageModel,
     embeddings: Embeddings,
-    weights: List[float] = [0.75, 0.25],
+    #weights: List[float] = [0.75, 0.25],
+    weights: List[float] = [0.5, 0.5],
     beta: float = 1.0,
     callbacks: Callbacks = None
 ) -> float:
@@ -218,15 +219,17 @@ async def calculate_factuality(
         answer=json.dumps(answer_stmts),
         ground_truth=json.dumps(gt_stmts)
     )
-    response = await llm.ainvoke(prompt, config={"callbacks": callbacks})
+    #response = await llm.ainvoke(prompt, config={"callbacks": callbacks})
     
     try:
-        classification = ClassificationWithReason(**json.loads(response.content))
+        structured_llm = llm.with_structured_output(ClassificationWithReason)
+        classification = await structured_llm.ainvoke(prompt)
         tp = len(classification.TP)
         fp = len(classification.FP)
         fn = len(classification.FN)
         return fbeta_score(tp, fp, fn, beta)
-    except (json.JSONDecodeError, TypeError):
+    except (json.JSONDecodeError, TypeError) as err:
+        # print(err)
         return 0.0  # Return minimum score on failure
 
 async def calculate_semantic_similarity(
