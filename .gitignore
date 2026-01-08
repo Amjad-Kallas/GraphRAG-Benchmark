@@ -2,3 +2,8 @@ results/
 __pycache__
 *.pyc
 *.log
+llm_cache
+hipporag2_workspace
+fast-graphrag_workspace
+*.pkl
+*.pklz
