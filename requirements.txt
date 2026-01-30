@@ -11,3 +11,10 @@ rouge_score==0.1.2
 json5
 json_repair
 igraph
+importlib-metadata==8.0.0
+jaraco.collections==5.1.0
+platformdirs==4.2.2
+sentence-transformers==5.1.2
+shellingham==1.5.4
+tomli==2.0.1
+typer-slim==0.20.0
